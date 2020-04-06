@@ -1,28 +1,11 @@
-import numpy as np
 import operator as operatorclass
-import intervals as I
-import random
-import sys
 
-operators = {
-    ">": operatorclass.gt,
-    ">=": operatorclass.ge,
-    "<": operatorclass.lt,
-    "<=": operatorclass.le
-}
-
+#Definition of operators
 operators_iv = {
     operatorclass.gt: ">",
     operatorclass.ge: "\geq",
     operatorclass.lt: "<",
     operatorclass.le: "\leq"
-}
-
-operators_iv_g = {
-    operatorclass.gt: "_gt_",
-    operatorclass.ge: "_ge_",
-    operatorclass.lt: "_lt_",
-    operatorclass.le: "_le_"
 }
 
 negation_operators = {
@@ -38,14 +21,15 @@ negation_operators = {
 
 class STLFormula:
     """
-    An STL Formula. It consists of
-        - A robustness function (robustness)
-        - An Abstract Syntax Tree (ast)
+    Class for representing an STL Formula.
     """
     
     
     
     def toNegationNormalForm(phi,inNegation):
+        """
+        Recursive function returning the Negation Normal Form of an STL Formula
+        """
         if isinstance(phi, STLFormula.TrueF):
             if inNegation:
                 return STLFormula.FalseF()
@@ -83,6 +67,9 @@ class STLFormula:
     
     
     def simplify_dtlearn(phi):
+        """
+        Function simplifying an STL Formula
+        """
         if isinstance(phi, STLFormula.TrueF):
             return phi
         if isinstance(phi, STLFormula.FalseF):
@@ -125,88 +112,48 @@ class STLFormula:
     
     
     
-    def simplify(phi):
-        if isinstance(phi, STLFormula.TrueF):
-            return phi
-        if isinstance(phi, STLFormula.FalseF):
-            return phi
-        if isinstance(phi, STLFormula.Negation):
-            return STLFormula.Negation(STLFormula.simplify(phi.formula))
-        if isinstance(phi, STLFormula.Eventually):
-            return STLFormula.Eventually(STLFormula.simplify(phi.formula),phi.t1,phi.t2)
-        if isinstance(phi, STLFormula.Always):
-            return STLFormula.Always(STLFormula.simplify(phi.formula),phi.t1,phi.t2)
-        if isinstance(phi, STLFormula.Disjunction):
-            if random.random() > 0.75:
-                if random.random() > 0.5:
-                    return STLFormula.simplify(phi.first_formula)
-                else:
-                    return STLFormula.simplify(phi.second_formula)
-            else:
-                return STLFormula.Disjunction(STLFormula.simplify(phi.first_formula),STLFormula.simplify(phi.second_formula))
-        if isinstance(phi, STLFormula.Conjunction):
-            return STLFormula.Conjunction(STLFormula.simplify(phi.first_formula),STLFormula.simplify(phi.second_formula))
-        if isinstance(phi, STLFormula.Predicate):
-            return phi
 
-
-
-    def minI(I1,I2):
-        return I.closed( min(I1.lower,I2.lower) , min(I1.upper,I2.upper) )
-
-
-
-    def maxI(I1,I2):
-        return I.closed( max(I1.lower,I2.lower) , max(I1.upper,I2.upper) )
-
-
-
-    def minusI(I1):
-        return I.closed(-I1.upper,-I1.lower)
-
-
-
-    def minI_l(listI):
-        return I.closed( min([i.lower for i in listI]), min([i.upper for i in listI]) )
-
-
-
-    def maxI_l(listI):
-        return I.closed( max([i.lower for i in listI]), max([i.upper for i in listI]) )
-    
-
-
-    def I_is_singleton(i):
-        return i.lower == i.upper
-    
     
     
     
     class TrueF:
+        """
+        Class representing the True boolean constant
+        """
         def __init__(self):
             self.robustness = lambda s, t : float('inf')
-            self.horizon = 1
-            
-        def tex(self):
-            return "\\top"
+            self.horizon = 0
             
         def __str__(self):
-            return "_top"
-            
-            
+            return "\\top"
+
+
+
     class FalseF:
+        """
+        Class representing the False boolean constant
+        """
         def __init__(self):
             self.robustness = lambda s, t : float('-inf')
-            self.horizon = 1
-            
-        def tex(self):
-            return "\\bot"
+            self.horizon = 0
             
         def __str__(self):
-            return "_bot"
-            
-    
+            return "\\bot"
+
+
+
     class Predicate:
+        """
+        Class representing a Predicate, s.t. f(s) \sim \mu
+        The constructor takes 4 arguments:
+            * dimension: string/name of the dimension
+            * operator: operator (geq, lt...)
+            * mu: \mu
+            * pi_index_signal: in the signal, which index corresponds to the predicate's dimension
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,(f(s) \sim \mu),t) & = \begin{cases} \mu-f(s_t) & \sim=\le \\ f(s_t)-\mu & \sim=\ge \end{cases}
+            * horizon: 0
+        """
         def __init__(self,dimension,operator,mu,pi_index_signal):
             self.pi_index_signal = pi_index_signal
             self.dimension = dimension
@@ -214,32 +161,26 @@ class STLFormula:
             self.mu = mu
             if operator == operatorclass.gt or operator == operatorclass.ge:
                 self.robustness = lambda s, t : s[t][pi_index_signal] - mu
-                # self.robustness = lambda s, t : s[t,pi_index_signal] - mu
             else:
                 self.robustness = lambda s, t : -s[t][pi_index_signal] + mu
-                # self.robustness = lambda s, t : -s[t,pi_index_signal] + mu
-                
-            def rosi(s,t):
-                try:
-                    if s:
-                        return I.closed(self.robustness(s,t),self.robustness(s,t))
-                    else:
-                        return I.open(-I.inf,I.inf)
-                except IndexError:
-                    return I.open(-I.inf,I.inf)
-            self.rosi = rosi
             
             self.horizon = 0
         
-        def tex(self):
-            return self.dimension+operators_iv[self.operator]+str(self.mu)
-            
         def __str__(self):
-            return self.dimension+operators_iv_g[self.operator]+str(self.mu)
-            
-    
-    
+            return self.dimension+operators_iv[self.operator]+str(self.mu)
+
+
+
     class Conjunction: 
+        """
+        Class representing the Conjunction operator, s.t. \phi_1 \land \phi_2.
+        The constructor takes 2 arguments:
+            * formula 1: \phi_1
+            * formula 2: \phi_2
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,\phi_1 \land \phi_2,t) = \min(\rho(s,\phi_1,t),\rho(s,\phi_2,t) )
+            * horizon: \left\|\phi_1 \land \phi_2\right\|= \max\{\left\|\phi_1\right\|, \left\|\phi_2\right\|\}
+        """
         def __init__(self,first_formula,second_formula):
             self.first_formula = first_formula
             self.second_formula = second_formula
@@ -247,31 +188,41 @@ class STLFormula:
                                             second_formula.robustness(s,t) )
             self.horizon = max( first_formula.horizon, 
                                             second_formula.horizon )
-            self.rosi = lambda s, t : STLFormula.minI( first_formula.rosi(s,t),
-                                            second_formula.rosi(s,t) )
-        
-        def tex(self):
-            return "("+self.first_formula.tex()+") \wedge ("+self.second_formula.tex()+")"
         
         def __str__(self):
-            return str(self.first_formula)+"_wedge_"+str(self.second_formula)
-        
-        
+            return "("+str(self.first_formula)+") \wedge ("+str(self.second_formula)+")"
+
+
+
     class Negation: 
+        """
+        Class representing the Negation operator, s.t. \neg \phi.
+        The constructor takes 1 argument:
+            * formula 1: \phi
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,\neg \phi,t) = - \rho(s,\phi,t)
+            * horizon: \left\|\phi\right\|=\left\|\neg \phi\right\|
+        """
         def __init__(self,formula):
             self.formula = formula
             self.robustness = lambda s, t : -formula.robustness(s,t)
             self.horizon = formula.horizon
-            self.rosi = lambda s, t : STLFormula.minusI(formula.rosi(s,t))
         
-        def tex(self):
-            return "\lnot ("+self.formula.tex()+")"
-            
         def __str__(self):
-            return "_lnot_"+str(self.formula)+"_"
+            return "\lnot ("+str(self.formula)+")"
+
     
     
     class Disjunction: 
+        """
+        Class representing the Disjunction operator, s.t. \phi_1 \vee \phi_2.
+        The constructor takes 2 arguments:
+            * formula 1: \phi_1
+            * formula 2: \phi_2
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,\phi_1 \lor \phi_2,t) = \max(\rho(s,\phi_1,t),\rho(s,\phi_2,t) )
+            * horizon: \left\|\phi_1 \lor \phi_2\right\|= \max\{\left\|\phi_1\right\|, \left\|\phi_2\right\|\}
+        """
         def __init__(self,first_formula,second_formula):
             self.first_formula = first_formula
             self.second_formula = second_formula
@@ -279,71 +230,64 @@ class STLFormula:
                                             second_formula.robustness(s,t) )
             self.horizon = max( first_formula.horizon, 
                                             second_formula.horizon )
-            self.rosi = lambda s, t : STLFormula.maxI( first_formula.rosi(s,t),
-                                            second_formula.rosi(s,t) )
         
-        def tex(self):
-            return "("+self.first_formula.tex()+") \\vee ("+self.second_formula.tex()+")"
-            
         def __str__(self):
-            return str(self.first_formula)+"_vee_"+str(self.second_formula)
+            return "("+str(self.first_formula)+") \\vee ("+str(self.second_formula)+")"
+
     
     
     class Always: 
+        """
+        Class representing the Always operator, s.t. \mathcal{G}_{[t1,t2]} \phi.
+        The constructor takes 3 arguments:
+            * formula: a formula \phi
+            * t1: lower time interval bound
+            * t2: upper time interval bound
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,\mathcal{G}_{[t1,t2]}~ \phi,t) = \underset{t' \in t+[t1,t2]}\min~  \rho(s,\phi,t').
+            * horizon: \left\|\mathcal{G}_{[t1, t2]} \phi\right\|=t2+ \left\|\phi\right\|
+        """
         def __init__(self,formula,t1,t2):
             self.formula = formula
             self.t1 = t1
             self.t2 = t2
             self.robustness = lambda s, t : min([ formula.robustness(s,k) for k in range(t+t1, t+t2+1)])
-            self.rosi = lambda s, t : STLFormula.minI_l([ formula.rosi(s,k) for k in range(t+t1, t+t2+1)])
             self.horizon = t2 + formula.horizon
         
-        def tex(self):
-            return "\mathcal{G}_{["+str(self.t1)+","+str(self.t2)+"]}("+self.formula.tex()+")"
-            
         def __str__(self):
-            # return "\square_{["+str(self.t1)+","+str(self.t2)+"]}("+str(self.formula)+")"
-            return "_mathcal_G_"+str(self.t1)+"_"+str(self.t2)+"_"+str(self.formula)+"_"
-               
+            return "\mathcal{G}_{["+str(self.t1)+","+str(self.t2)+"]}("+str(self.formula)+")"
 
-        
+
+
     class Eventually: 
+        """
+        Class representing the Eventually operator, s.t. \mathcal{F}_{[t1,t2]} \phi.
+        The constructor takes 3 arguments:
+            * formula: a formula \phi
+            * t1: lower time interval bound
+            * t2: upper time interval bound
+        The class contains 2 additional attributes:
+            * robustness: a function \rho(s,\mathcal{F}_{[t1,t2]}~ \phi,t) = \underset{t' \in t+[t1,t2]}\max~  \rho(s,\phi,t').
+            * horizon: \left\|\mathcal{F}_{[t1, t2]} \phi\right\|=t2+ \left\|\phi\right\|
+        """
         def __init__(self,formula,t1,t2):
             self.formula = formula
             self.t1 = t1
             self.t2 = t2
             self.robustness = lambda s, t :  max([ formula.robustness(s,k) for k in range(t+t1, t+t2+1)])
-            self.rosi = lambda s, t :  STLFormula.maxI_l([ formula.rosi(s,k) for k in range(t+t1, t+t2+1)])
             self.horizon = t2 + formula.horizon
         
-        def tex(self):
-            return "\mathcal{F}_{["+str(self.t1)+","+str(self.t2)+"]}("+self.formula.tex()+")"
-            
         def __str__(self):
-            # return "\lozenge_{["+str(self.t1)+","+str(self.t2)+"]}("+str(self.formula)+")"
-            return "_mathcal_F_"+str(self.t1)+"_"+str(self.t2)+"_"+str(self.formula)+"_"
+            return "\mathcal{F}_{["+str(self.t1)+","+str(self.t2)+"]}("+str(self.formula)+")"
     
     
-    # class Xor: 
-        # def __init__(self,first_formula,second_formula):
-            # self.first_formula = first_formula
-            # self.second_formula = second_formula
-            # self.robustness = lambda s, t : max( min( first_formula.robustness(s,t),
-                                            # -second_formula.robustness(s,t) ) ,
-                                            # min( -first_formula.robustness(s,t),
-                                            # second_formula.robustness(s,t) ) )
-            # self.rosi = lambda s, t : STLFormula.maxI( STLFormula.minI( first_formula.rosi(s,t),
-                                            # -second_formula.rosi(s,t) ) ,
-                                            # STLFormula.minI( -first_formula.rosi(s,t),
-                                            # second_formula.rosi(s,t) ) )
-            # self.horizon = max( first_formula.horizon, 
-                                            # second_formula.horizon )  
-            
-        # def __str__(self):
-            # return str(self.first_formula)+" \oplus "+str(self.second_formula)
     
     def Xor(first_formula,second_formula):
-        # if isinstance(first_formula, STLFormula.TrueF):
-            # return  STLFormula.toNegationNormalForm(STLFormula.Conjunction(second_formula,STLFormula.Negation(second_formula)),False)
-        # return STLFormula.toNegationNormalForm(STLFormula.Conjunction(STLFormula.Disjunction(first_formula,second_formula),STLFormula.Disjunction(STLFormula.Negation(first_formula),STLFormula.Negation(second_formula))),False)
-        return STLFormula.toNegationNormalForm(second_formula,False)
+        """
+        Function returning the XOR of 2 STL formulae:
+        
+        \phi_1 \oplus \phi_2 = (\phi_1 \vee \phi_2) \wedge (\neg \phi_1 \vee \neg \phi_2)
+        """
+        if isinstance(first_formula, STLFormula.TrueF):
+            return STLFormula.Conjunction(second_formula,STLFormula.Negation(second_formula))
+        return STLFormula.Conjunction(STLFormula.Disjunction(first_formula,second_formula),STLFormula.Disjunction(STLFormula.Negation(first_formula),STLFormula.Negation(second_formula)))
