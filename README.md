@@ -7,8 +7,9 @@ active-learn-stl is a Python library that infers Signal Temporal Logic Specifica
 
 ## Introduction
 
+STL is
 
-STL
+
 
 ## Downloading sources
 
@@ -20,8 +21,10 @@ $ git clone https://github.com/allinard/active-learn-stl.git
 Dependencies:
 * Python 3
 * Gurobi MILP Solver
+* Pupl
 
 
-## Evolutionary Algorithm 
 
-The module `STLActiveLearn.py` implements the active learning algorithm for learning an STL formula.
+## STL Distance
+
+The module `STLDistance.py` implements the calculation of the distance between 2 STL Formulae.

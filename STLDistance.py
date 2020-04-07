@@ -1,26 +1,29 @@
 from STL import STLFormula
-from STLpulp import *
 import operator as operatorclass
 import pulp as plp
-import numpy as np
-import math
+
+
 
 #CONSTANTS
-INDEX_X = 0
-INDEX_Y = 1
 M_up = 100000
 M_low = 0.000001
 
-
-
+#HARDCODED
+#TODO: manage more dimensions
+NB_DIMENSIONS = 2
 
 
 def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
+    """
+        Function computing the directed distance of 2 STL Formulae.
+        Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
+        The encoding details of the MILP optimization problem follow Raman et al., "Model  predictive  control  with  signaltemporal logic specifications,” in 53rd IEEE Conference on Decision and Control. IEEE, 2014, pp. 81–87.
+    """
 
     dict_vars = {}
   
     #objective, maximize epsilon
-    epsilon = plp.LpVariable(name='epsilon',cat='Continuous',lowBound=0)
+    epsilon = plp.LpVariable(name='epsilon',cat='Continuous',lowBound=0,upBound=rand_area[1]-rand_area[0])
     
     #satisfaction of phi1 and phi2
     zvar1 = plp.LpVariable('z1_'+str(id(phi1))+'_t_'+str(phi1.horizon),cat='Binary')
@@ -35,7 +38,7 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
             
     #We want to optimize a signal. The lower and upperbounds are specified by the random area.
-    s = plp.LpVariable.dicts("s",(range(max(phi1.horizon,phi2.horizon)+1),range(2)),rand_area[0],rand_area[1],plp.LpContinuous)    
+    s = plp.LpVariable.dicts("s",(range(max(phi1.horizon,phi2.horizon)+1),range(NB_DIMENSIONS)),rand_area[0],rand_area[1],plp.LpContinuous)    
        
        
     #recursive function
@@ -173,11 +176,11 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
                 zvar = plp.LpVariable('z2_'+str(id(phi))+'_t_'+str(t),cat='Binary')
                 dict_vars['z2_'+str(id(phi))+'_t_'+str(t)] = zvar
             if phi.operator == operatorclass.gt or phi.operator == operatorclass.ge:
-                opt_model += s[t][phi.pi_index_signal] - phi.mu - epsilon <= M_up*zvar-M_low
+                opt_model += s[t][phi.pi_index_signal] - phi.mu + epsilon <= M_up*zvar-M_low
                 opt_model += -(s[t][phi.pi_index_signal] - phi.mu) - epsilon <= M_up*(1-zvar)-M_low
             else:
                 opt_model += -s[t][phi.pi_index_signal] + phi.mu + epsilon <= M_up*zvar-M_low
-                opt_model += -(-s[t][phi.pi_index_signal] + phi.mu) + epsilon <= M_up*(1-zvar)-M_low
+                opt_model += -(-s[t][phi.pi_index_signal] + phi.mu) - epsilon <= M_up*(1-zvar)-M_low
         elif isinstance(phi, STLFormula.Conjunction):
             model_phi2(phi.first_formula,t,opt_model)
             model_phi2(phi.second_formula,t,opt_model)
@@ -262,8 +265,6 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
         
     opt_model.solve(plp.GUROBI_CMD(msg=False))
     
-    # print( [[s[j][i].varValue for i in range(2)] for j in range(max(phi1.horizon,phi2.horizon)+1)] )
-
     if epsilon.varValue == None:
         return 0.0
     return epsilon.varValue
@@ -280,8 +281,17 @@ def pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
 
 
-def test():
-    #test metrics
+
+
+
+
+if __name__ == '__main__':
+    
+    #Constant
+    INDEX_X = 0
+    INDEX_Y = 1
+    
+    #Examples of Madsen et al. (2018)
     predicate_x_ge02 = STLFormula.Predicate('x',operatorclass.ge,0.2,INDEX_X)
     predicate_x_lt04 = STLFormula.Predicate('x',operatorclass.le,0.4,INDEX_X)
     predicate_x_lt044 = STLFormula.Predicate('x',operatorclass.le,0.44,INDEX_X)
@@ -292,35 +302,87 @@ def test():
     phi4 = STLFormula.Conjunction(STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20),STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt044),0,20))
     phi5 = STLFormula.Conjunction(STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,10),STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt044),12,20))
     phi6 = STLFormula.Always(STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,4),0,16)
+    true = STLFormula.TrueF()
 
-    # print(phi1,"\\\\")
-    # print(phi2,"\\\\")
-    # print(phi3,"\\\\")
-    # print(phi4,"\\\\")
-    # print(phi5,"\\\\")
-    # print(phi6,"\\\\")
 
+    #Reproduces the results of Madsen et al. (2018)
+    rand_area = [0,1]
+    
+    print('d(True,phi1)',pompeiu_hausdorff_distance(true,phi1,rand_area),'(0.6)')
+    print('d(phi1,phi1)',pompeiu_hausdorff_distance(phi1,phi1,rand_area),'(0.0)')
+    print('d(phi1,phi2)',pompeiu_hausdorff_distance(phi1,phi2,rand_area),'(0.04)')
+    print('d(phi1,phi3)',pompeiu_hausdorff_distance(phi1,phi3,rand_area),'(0.6)')
+    print('d(phi1,phi4)',pompeiu_hausdorff_distance(phi1,phi4,rand_area),'(0.0)')
+    print('d(phi1,phi5)',pompeiu_hausdorff_distance(phi1,phi5,rand_area),'(0.6)')
+    print('d(phi1,phi6)',pompeiu_hausdorff_distance(phi1,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('d(True,phi2)',pompeiu_hausdorff_distance(true,phi2,rand_area),'(0.56)')
+    print('d(phi2,phi2)',pompeiu_hausdorff_distance(phi2,phi2,rand_area),'(0.0)')
+    print('d(phi2,phi3)',pompeiu_hausdorff_distance(phi2,phi3,rand_area),'(0.56)')
+    print('d(phi2,phi4)',pompeiu_hausdorff_distance(phi2,phi4,rand_area),'(0.04)')
+    print('d(phi2,phi5)',pompeiu_hausdorff_distance(phi2,phi5,rand_area),'(0.56)')
+    print('d(phi2,phi6)',pompeiu_hausdorff_distance(phi2,phi6,rand_area),'(0.56)')
+
+    print('')
+
+    print('d(True,phi3)',pompeiu_hausdorff_distance(true,phi3,rand_area),'(0.6)')
+    print('d(phi3,phi3)',pompeiu_hausdorff_distance(phi3,phi3,rand_area),'(0.0)')
+    print('d(phi3,phi4)',pompeiu_hausdorff_distance(phi3,phi4,rand_area),'(0.6)')
+    print('d(phi3,phi5)',pompeiu_hausdorff_distance(phi3,phi5,rand_area),'(0.6)')
+    print('d(phi3,phi6)',pompeiu_hausdorff_distance(phi3,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('d(True,phi4)',pompeiu_hausdorff_distance(true,phi4,rand_area),'(0.6)')
+    print('d(phi4,phi4)',pompeiu_hausdorff_distance(phi4,phi4,rand_area),'(0.0)')
+    print('d(phi4,phi5)',pompeiu_hausdorff_distance(phi4,phi5,rand_area),'(0.6)')
+    print('d(phi4,phi6)',pompeiu_hausdorff_distance(phi4,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('d(True,phi5)',pompeiu_hausdorff_distance(true,phi5,rand_area),'(0.6)')
+    print('d(phi5,phi5)',pompeiu_hausdorff_distance(phi5,phi5,rand_area),'(0.0)')
+    print('d(phi5,phi6)',pompeiu_hausdorff_distance(phi5,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('d(True,phi6)',pompeiu_hausdorff_distance(true,phi6,rand_area),'(0.6)')
+    print('d(phi6,phi6)',pompeiu_hausdorff_distance(phi6,phi6,rand_area),'(0.0)')
+    
+    
+    print('')
+    print('')
+    
+    #Example motion planning
+    
+    predicate_x_gt0 = STLFormula.Predicate('x',operatorclass.gt,0,INDEX_X)
+    predicate_x_le1 = STLFormula.Predicate('x',operatorclass.le,1,INDEX_X)
+    predicate_y_gt3 = STLFormula.Predicate('y',operatorclass.gt,3,INDEX_Y)
+    predicate_y_le4 = STLFormula.Predicate('y',operatorclass.le,4,INDEX_Y)
+    eventually1 = STLFormula.Eventually(STLFormula.Conjunction( STLFormula.Conjunction(predicate_x_gt0,predicate_x_le1) , STLFormula.Conjunction(predicate_y_gt3,predicate_y_le4) ),10,20)
     predicate_x_gt3 = STLFormula.Predicate('x',operatorclass.gt,3,INDEX_X)
     predicate_x_le4 = STLFormula.Predicate('x',operatorclass.le,4,INDEX_X)
-    predicate_y_gt2 = STLFormula.Predicate('y',operatorclass.gt,2,INDEX_Y)
-    predicate_y_le3 = STLFormula.Predicate('y',operatorclass.le,3,INDEX_Y)
-    eventually = STLFormula.Eventually(STLFormula.Conjunction( STLFormula.Conjunction(predicate_x_gt3,predicate_x_le4) , STLFormula.Conjunction(predicate_y_gt2,predicate_y_le3) ),0,30)
-    predicate_x_gt1 = STLFormula.Predicate('x',operatorclass.gt,1,INDEX_X)
-    predicate_x_le2 = STLFormula.Predicate('x',operatorclass.le,2,INDEX_X)
-    always = STLFormula.Always( STLFormula.Negation( STLFormula.Conjunction( STLFormula.Conjunction(predicate_x_gt1,predicate_x_le2) , STLFormula.Conjunction(predicate_y_gt2,predicate_y_le3) ) ),0,30) 
-    phi = STLFormula.Conjunction(eventually,always)
-    phi_prime = STLFormula.Conjunction(phi,STLFormula.Always( STLFormula.Negation( STLFormula.Conjunction( STLFormula.Conjunction(STLFormula.Predicate('x',operatorclass.gt,1,INDEX_X),STLFormula.Predicate('x',operatorclass.lt,2,INDEX_X)) , STLFormula.Conjunction(STLFormula.Predicate('y',operatorclass.gt,0.5,INDEX_Y),STLFormula.Predicate('y',operatorclass.lt,1.5,INDEX_Y)) ) ),0,30) )
-    phi1_nnf = STLFormula.toNegationNormalForm(phi,False)
-    phi2_nnf = STLFormula.toNegationNormalForm(phi_prime,False)
+    predicate_y_gt0 = STLFormula.Predicate('y',operatorclass.gt,0,INDEX_Y)
+    predicate_y_le1 = STLFormula.Predicate('y',operatorclass.le,1,INDEX_Y)
+    eventually2 = STLFormula.Eventually(STLFormula.Conjunction( STLFormula.Conjunction(predicate_x_gt3,predicate_x_le4) , STLFormula.Conjunction(predicate_y_gt0,predicate_y_le1) ),30,50)
+    predicate_x_gt2 = STLFormula.Predicate('x',operatorclass.gt,2,INDEX_X)
+    predicate_y_gt1 = STLFormula.Predicate('y',operatorclass.gt,1,INDEX_Y)
+    predicate_x_le3 = STLFormula.Predicate('x',operatorclass.le,3,INDEX_X)
+    predicate_y_le2 = STLFormula.Predicate('y',operatorclass.le,2,INDEX_Y)
+    always = STLFormula.Always( STLFormula.Negation( STLFormula.Conjunction( STLFormula.Conjunction(predicate_x_gt2,predicate_x_le3) , STLFormula.Conjunction(predicate_y_gt1,predicate_y_le2) ) ),0,50) 
+    phi = STLFormula.Conjunction(STLFormula.Conjunction(eventually1,eventually2),always)
+    phi_target = STLFormula.toNegationNormalForm(phi,False)
+
+    phi_hypothesis = STLFormula.Conjunction(eventually1,eventually2)
+
+    rand_area = [0,4]
+
+    print(pompeiu_hausdorff_distance(true,phi_target,rand_area))
+    print(pompeiu_hausdorff_distance(phi_hypothesis,phi_target,rand_area))
+    print(pompeiu_hausdorff_distance(eventually1,eventually2,rand_area))
 
 
-    rand_area = [-2,4]
-
-    print(pompeiu_hausdorff_distance(phi1_nnf,phi2_nnf,rand_area))
-    print(pompeiu_hausdorff_distance(STLFormula.TrueF(),phi2_nnf,rand_area))
-
-    print(directed_pompeiu_hausdorff_distance(phi2,phi1,rand_area),directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area))
-    print(directed_pompeiu_hausdorff_distance(phi3,phi1,rand_area),directed_pompeiu_hausdorff_distance(phi1,phi3,rand_area))
-    print(directed_pompeiu_hausdorff_distance(phi1,phi1,rand_area))
     
-# test()
+    

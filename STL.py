@@ -244,7 +244,7 @@ class STLFormula:
             * t1: lower time interval bound
             * t2: upper time interval bound
         The class contains 2 additional attributes:
-            * robustness: a function \rho(s,\mathcal{G}_{[t1,t2]}~ \phi,t) = \underset{t' \in t+[t1,t2]}\min~  \rho(s,\phi,t').
+            * robustness: a function \rho(s,\mathcal{G}_{[t1,t2]}~ \phi,t) = underset{t' \in t+[t1,t2]}\min~  \rho(s,\phi,t').
             * horizon: \left\|\mathcal{G}_{[t1, t2]} \phi\right\|=t2+ \left\|\phi\right\|
         """
         def __init__(self,formula,t1,t2):
@@ -267,7 +267,7 @@ class STLFormula:
             * t1: lower time interval bound
             * t2: upper time interval bound
         The class contains 2 additional attributes:
-            * robustness: a function \rho(s,\mathcal{F}_{[t1,t2]}~ \phi,t) = \underset{t' \in t+[t1,t2]}\max~  \rho(s,\phi,t').
+            * robustness: a function \rho(s,\mathcal{F}_{[t1,t2]}~ \phi,t) = underset{t' \in t+[t1,t2]}\max~  \rho(s,\phi,t').
             * horizon: \left\|\mathcal{F}_{[t1, t2]} \phi\right\|=t2+ \left\|\phi\right\|
         """
         def __init__(self,formula,t1,t2):
