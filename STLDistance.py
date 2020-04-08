@@ -15,7 +15,11 @@ NB_DIMENSIONS = 2
 
 def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
     """
-        Function computing the directed distance of 2 STL Formulae.
+        Function computing the directed pompeiu-hausdorff distance between 2 STL Formulae.
+        Takes as input:
+            * phi1: an STL Formula
+            * phi2: an STL Formula
+            * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
         Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
         The encoding details of the MILP optimization problem follow Raman et al., "Model  predictive  control  with  signaltemporal logic specifications,” in 53rd IEEE Conference on Decision and Control. IEEE, 2014, pp. 81–87.
     """
@@ -274,6 +278,14 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
 
 def pompeiu_hausdorff_distance(phi1,phi2,rand_area):
+    """
+        Function computing the pompeiu-hausdorff distance between 2 STL Formulae.
+        Takes as input:
+            * phi1: an STL Formula
+            * phi2: an STL Formula
+            * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+        Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
+    """
     return round(max(directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area),directed_pompeiu_hausdorff_distance(phi2,phi1,rand_area)),5)
 
 
