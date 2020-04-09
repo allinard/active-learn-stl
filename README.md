@@ -7,7 +7,10 @@ active-learn-stl is a Python library that infers Signal Temporal Logic Specifica
 
 ## Introduction
 
-STL is
+STL is a temporal logic defined on continuous signals that can be used for specifications on systems. 
+It can express system properties that include time bounds and bounds on physical system parameters.
+One of its advantag is its richness to specify continuous-time systems.
+ It is, in the case of robotics, an attractive formalism to model, for instance, classes of desired trajectories.
 
 
 
