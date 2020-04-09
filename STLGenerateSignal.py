@@ -74,6 +74,22 @@ def generate_signal_milp_quantitative(phi,start,rand_area,U,epsilon,OPTIMIZE_ROB
             else:
                 opt_model += -s[t][phi.pi_index_signal] + phi.mu == rvar
             
+        elif isinstance(phi, STLFormula.TrueF):
+            try:
+                rvar = dict_vars['r_'+str(id(phi))+'_t_'+str(t)]
+            except KeyError:
+                rvar = plp.LpVariable('r_'+str(id(phi))+'_t_'+str(t),cat='Continuous')
+                dict_vars['r_'+str(id(phi))+'_t_'+str(t)] = rvar
+            opt_model += rvar >= M            
+            
+        elif isinstance(phi, STLFormula.FalseF):
+            try:
+                rvar = dict_vars['r_'+str(id(phi))+'_t_'+str(t)]
+            except KeyError:
+                rvar = plp.LpVariable('r_'+str(id(phi))+'_t_'+str(t),cat='Continuous')
+                dict_vars['r_'+str(id(phi))+'_t_'+str(t)] = rvar
+            opt_model += rvar <= -M
+            
         elif isinstance(phi, STLFormula.Conjunction):
             model_phi(phi.first_formula,t,opt_model)
             model_phi(phi.second_formula,t,opt_model)
@@ -237,6 +253,13 @@ def generate_signal_milp_boolean(phi,start,rand_area,U,epsilon):
                 zvar = plp.LpVariable('z1_'+str(id(phi))+'_t_'+str(t),cat='Binary')
                 dict_vars['z1_'+str(id(phi))+'_t_'+str(t)] = zvar
             opt_model += zvar == 1
+        elif isinstance(phi, STLFormula.FalseF):
+            try:
+                zvar = dict_vars['z1_'+str(id(phi))+'_t_'+str(t)]
+            except KeyError:
+                zvar = plp.LpVariable('z1_'+str(id(phi))+'_t_'+str(t),cat='Binary')
+                dict_vars['z1_'+str(id(phi))+'_t_'+str(t)] = zvar
+            opt_model += zvar == 0
         if isinstance(phi, STLFormula.Predicate):
             try:
                 zvar = dict_vars['z1_'+str(id(phi))+'_t_'+str(t)]

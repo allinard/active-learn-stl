@@ -54,6 +54,13 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
                 zvar = plp.LpVariable('z1_'+str(id(phi))+'_t_'+str(t),cat='Binary')
                 dict_vars['z1_'+str(id(phi))+'_t_'+str(t)] = zvar
             opt_model += zvar == 1
+        elif isinstance(phi, STLFormula.FalseF):
+            try:
+                zvar = dict_vars['z1_'+str(id(phi))+'_t_'+str(t)]
+            except KeyError:
+                zvar = plp.LpVariable('z1_'+str(id(phi))+'_t_'+str(t),cat='Binary')
+                dict_vars['z1_'+str(id(phi))+'_t_'+str(t)] = zvar
+            opt_model += zvar == 0
         elif isinstance(phi, STLFormula.Negation):
             model_phi1(phi.formula,t,opt_model)
             try:
@@ -160,6 +167,13 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
                 zvar = plp.LpVariable('z2_'+str(id(phi))+'_t_'+str(t),cat='Binary')
                 dict_vars['z2_'+str(id(phi))+'_t_'+str(t)] = zvar
             opt_model += zvar == 1
+        elif isinstance(phi, STLFormula.FalseF):
+            try:
+                zvar = dict_vars['z2_'+str(id(phi))+'_t_'+str(t)]
+            except KeyError:
+                zvar = plp.LpVariable('z2_'+str(id(phi))+'_t_'+str(t),cat='Binary')
+                dict_vars['z2_'+str(id(phi))+'_t_'+str(t)] = zvar
+            opt_model += zvar == 0
         elif isinstance(phi, STLFormula.Negation):
             model_phi2(phi.formula,t,opt_model)
             try:
