@@ -1,4 +1,5 @@
 import operator as operatorclass
+import random
 
 #Definition of operators
 operators_iv = {
@@ -286,8 +287,14 @@ class STLFormula:
         """
         Function returning the XOR of 2 STL formulae:
         
-        \phi_1 \oplus \phi_2 = (\phi_1 \vee \phi_2) \wedge (\neg \phi_1 \vee \neg \phi_2)
+        \phi_1 \oplus \phi_2 = (\phi_1 \wedge \neg \phi_2) \vee (\neg \phi_1 \wedge \phi_2)
         """
         if isinstance(first_formula, STLFormula.TrueF):
-            return STLFormula.Conjunction(second_formula,STLFormula.Negation(second_formula))
-        return STLFormula.Conjunction(STLFormula.Disjunction(first_formula,second_formula),STLFormula.Disjunction(STLFormula.Negation(first_formula),STLFormula.Negation(second_formula)))
+            # return STLFormula.Negation(second_formula)
+            # trick for active learning algorithm: when the hypothesis is True, it is helpful to generate positive signals !
+            return second_formula
+        # trick for faster signal generation of a XOR: randomly return either
+        if random.random() > 0.5:
+            return STLFormula.Conjunction(first_formula,STLFormula.Negation(second_formula))
+        else: 
+            return STLFormula.Conjunction(STLFormula.Negation(first_formula),second_formula)
