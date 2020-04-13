@@ -36,8 +36,68 @@ Dependencies:
 ## STL
 
 The module `STL.py` implements the formalism of STL Formulae.
+It supports several boolean (Conjunction, Disjunction, Negation) and temporal operators (Always, Eventually).
 
 
+### True and False boolean constants
+
+```
+t = STLFormula.TrueF()
+f = STLFormula.FalseF()
+```
+
+
+### Predicate
+
+```
+x_gt3 = STLFormula.Predicate(dimension,operator,mu,pi_index_signal)
+```
+is an STL Formula, where the constructor takes 4 arguments:
+* dimension: string/name of the dimension (ex: 'x')
+* operator: operator (operatorclass.geq, operatorclass.lt, operatorclass.leq, operatorclass.gt)
+* mu: float mu (ex: 3)
+* pi_index_signal: in the signal, which index corresponds to the predicate's dimension (ex: 0)
+
+
+### Conjunction and Disjunction
+
+```
+c = STLFormula.Conjunction(phi1,phi2)
+d = STLFormula.Disjunction(phi1,phi2)
+```
+are STL Formulae respectively representing the Conjunction and Disjunction of 2 STL Formulae phi1 and ph2.
+
+
+### Negation
+
+```
+n = STLFormula.Negation(phi)
+```
+is an STL Formula representing the negation of an STL Formula phi.
+
+
+### Always and Eventually
+
+```
+a = STLFormula.Always(phi,t1,t2)
+e = STLFormula.Eventually(phi,t1,t2)
+```
+are STL Formulae respectively representing the Always and Eventually of an STL Formulae phi. They both takes 3 arguments:
+* formula: a formula phi
+* t1: lower time interval bound
+* t2: upper time interval bound
+
+
+### Robustness
+
+All STL Formulae contain 1 function to compute the robustness of a signal given the STL Formula.
+
+```
+x_gt3 = STLFormula.Predicate('x',operatorclass.gt,3,0)
+a = STLFormula.Always(phi,0,5)
+a.robustness([[3.1],[3.3],[3.2],[3.0],[2.9],[3.1],[3.5],[3.1],[2.2]],0)
+-0.1
+```
 
 
 
