@@ -191,7 +191,7 @@ Follows *publication under review*.
 ```
 active_learn = STLActiveLearn(phi_target,
 			      rand_area,
-				  start,
+			start,
 				  max_horizon,
 				  primitives='MOTION_PLANNING',
 				  signal_gen='QUANTITATIVE_OPTIMIZE',
