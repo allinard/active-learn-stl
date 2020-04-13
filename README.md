@@ -190,7 +190,7 @@ Follows *publication under review*.
 
 ```
 active_learn = STLActiveLearn(phi_target,
-							  rand_area,
+			rand_area,
 							  start,
 							  max_horizon,
 							  primitives='MOTION_PLANNING',
