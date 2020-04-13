@@ -191,18 +191,18 @@ Follows *publication under review*.
 ```
 active_learn = STLActiveLearn(phi_target,
 			      rand_area,
-			start,
-				  max_horizon,
-				  primitives='MOTION_PLANNING',
-				  signal_gen='QUANTITATIVE_OPTIMIZE',
+			      start,
+			      max_horizon,
+			      primitives='MOTION_PLANNING',
+			      signal_gen='QUANTITATIVE_OPTIMIZE',
 			      U=0.2,
-				  epsilon=0.05,
-				  alpha=0.01,
-				  beta=0.5,
-				  gamma=50,
-				  MAX_IT=100,
-				  phi_hypothesis=STLFormula.TrueF(),
-				  plot_activated=True)
+			      epsilon=0.05,
+			      alpha=0.01,
+			      beta=0.5,
+			      gamma=50,
+			      MAX_IT=100,
+			      phi_hypothesis=STLFormula.TrueF(),
+			      plot_activated=True)
 ```
 which actively learns a candidate STL specification given a System Under Test from which we can query information on its target specification `phi_target`:
 * `phi_target`: the target specification to learn
