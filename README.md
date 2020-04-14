@@ -203,6 +203,7 @@ active_learn = STLActiveLearn(phi_target,
 			      MAX_IT=100,
 			      phi_hypothesis=STLFormula.TrueF(),
 			      plot_activated=True)
+active_learn.dtlearn.simple_boolean()
 ```
 which actively learns a candidate STL specification given a System Under Test from which we can query information on its target specification `phi_target`:
 * `phi_target`: the target specification to learn
@@ -220,3 +221,4 @@ which actively learns a candidate STL specification given a System Under Test fr
 * `phi_hypothesis` (optional): the hypothesis specification (default set to `True`)
 * `plot_activated` (optional): show plot at each iteration (default set to `False`)
 
+`active_learn.dtlearn.simple_boolean()` returns the Conjunctive Normal Form of the learnt STL Formula.
