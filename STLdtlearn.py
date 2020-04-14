@@ -130,7 +130,7 @@ class DTLearn:
         simplified = simplified.replace("~","\\neg ")
         simplified = simplified.replace("|","\\vee")
         simplified = simplified.replace("&","\wedge")
-        for predicate in self.dictnodestr:
+        for predicate in reversed(sorted(self.dictnodestr.keys())):
             simplified = simplified.replace(predicate,self.dictnodestr[predicate])
         return simplified
     
