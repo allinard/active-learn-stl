@@ -8,7 +8,7 @@ from matplotlib.path import Path
 import matplotlib.patches as patches
 import pickle
 import time
-
+import copy
 
 
 
@@ -36,7 +36,7 @@ class STLActiveLearn:
     def __init__(self,phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=100,phi_hypothesis=STLFormula.TrueF(),plot_activated=False):
 
         #Instance of the DT learning algorithm
-        self.dtlearn = DTLearn(rand_area,max_horizon,primitives='MOTION_PLANNING')
+        self.dtlearn = DTLearn(rand_area,max_horizon,primitives=primitives)
         
         #For monitoring of experiments
         self.dic_results = {}
@@ -57,6 +57,7 @@ class STLActiveLearn:
 
         NO_IMPROVE = 0
         LAST_DIST = float("inf")
+        BEST_DIST = float("inf")
         BEST_HYPOTHESIS = STLFormula.TrueF()
         BEST_TREE = self.dtlearn.tree
 
@@ -79,12 +80,20 @@ class STLActiveLearn:
                     xor = STLFormula.Xor(phi_hypothesis_nnf,phi_target)
                     xor_nnf = STLFormula.toNegationNormalForm(xor,False)
                     #compute signal
-                    if signal_gen=='QUANTITATIVE_OPTIMIZE':
-                        signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,True)
-                    elif signal_gen=='QUANTITATIVE':
-                        signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,False)
-                    else:
-                        signal = generate_signal_milp_boolean(xor_nnf,start,rand_area,U,epsilon)    
+                    try:
+                        if signal_gen=='QUANTITATIVE_OPTIMIZE':
+                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,True)
+                        elif signal_gen=='QUANTITATIVE':
+                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,False)
+                        else:
+                            signal = generate_signal_milp_boolean(xor_nnf,start,rand_area,U,epsilon)
+                    except Exception:
+                        if signal_gen=='QUANTITATIVE_OPTIMIZE':
+                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,U,epsilon,True)
+                        elif signal_gen=='QUANTITATIVE':
+                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,U,epsilon,False)
+                        else:
+                            signal = generate_signal_milp_boolean(phi_target,start,rand_area,U,epsilon)
                     #let the teacher evaluate    
                     ro = round(phi_target.robustness(signal,0), 5)
                     print("robustness signal: ",ro)
@@ -109,13 +118,15 @@ class STLActiveLearn:
                             plt.pause(0.01)
                     #retrieve hypothesis
                     phi_hypothesis = self.dtlearn.toSTLformula()
-                    print("hypothesis: ",self.dtlearn.simple_boolean())
+                    print("hypothesis: ",STLFormula.simplify_dtlearn(phi_hypothesis))
                     distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area)
                     print("distance: ",distance)
                 #if distance < alpha, then the hypothesis and the target are considered equivalent. termination of algorithm.
                 else:
                     print("solution found")
                     print(self.dtlearn.simple_boolean())
+                    BEST_TREE = copy.deepcopy(self.dtlearn.tree)
+                    BEST_DIST = distance
                     break
                     
                     
@@ -184,7 +195,7 @@ class STLActiveLearn:
                         plt.pause(0.01)
                 #retrieve hypothesis
                 phi_hypothesis = self.dtlearn.toSTLformula()
-                print("hypothesis: ",self.dtlearn.simple_boolean())
+                print("hypothesis: ",STLFormula.simplify_dtlearn(phi_hypothesis))
                 distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area)
                 print("distance: ",distance)
 
@@ -192,7 +203,9 @@ class STLActiveLearn:
             if distance < LAST_DIST:
                 NO_IMPROVE = 0
                 LAST_DIST = distance
-                BEST_TREE = self.dtlearn.tree
+                if distance < BEST_DIST:
+                    BEST_TREE = copy.deepcopy(self.dtlearn.tree)
+                    BEST_DIST = distance
             elif NO_IMPROVE > 50:
                 if prior_knowledge:
                     invarnode = DTLearn.Leaf(STLFormula.FalseF())
@@ -286,24 +299,11 @@ if __name__ == '__main__':
     
     
     #Instatiate the Active Learning algorithm
-    begintime = time.time()
-    active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='MOTION_PLANNING',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=100,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
+    active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=200,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
+    
+    print("\n\n Done ")
+    
     print(active_learn.dtlearn.simple_boolean())
-    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(phi_hypothesis)))
-    # endtime = time.time()
-    # pos = open("pos.pickle",'wb')
-    # neg = open("neg.pickle",'wb')
-    # dic = open("dic.pickle",'wb')
-    # dic2 = open("dic2.pickle",'wb')
-    # tim = open("tim.pickle",'wb')
-    # pickle.dump(active_learn.dtlearn.positive_dataset,pos)
-    # pickle.dump(active_learn.dtlearn.negative_dataset,neg)
-    # pickle.dump(active_learn.dic_results,dic)
-    # pickle.dump(active_learn.dtlearn.dictnodestr,dic2)
-    # pickle.dump(endtime-begintime,tim)
-    # pos.close()
-    # neg.close()
-    # dic.close()
-    # dic2.close()
-    # tim.close()
+    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(active_learn.dtlearn.toSTLformula(),False),rand_area))
+
     exit()
