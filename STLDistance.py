@@ -1,6 +1,7 @@
 from STL import STLFormula
 import operator as operatorclass
 import pulp as plp
+from itertools import product, tee, accumulate, combinations
 
 
 
@@ -308,6 +309,448 @@ def pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
 
 
+#Definition of an iterator
+def pairwise(iterable):
+    "s -> (s0, s1), (s1, s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
+
+
+class Rectangle:
+    """
+    Class representing a Satisfaction box of an STL Formula
+    """
+    __slots__ = '__x1', '__y1', '__x2', '__y2', '__dimension'
+    
+    def __init__(self, x1, y1, x2, y2, dimension):
+        self.__setstate__((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2), dimension))
+
+    def __repr__(self):
+        return '{}({})'.format(type(self).__name__, ', '.join(map(repr, self)))
+
+    def __eq__(self, other):
+        return self.data == other.data
+
+    def __ne__(self, other):
+        return self.data != other.data
+
+    def __hash__(self):
+        return hash(self.data)
+
+    def __len__(self):
+        return 4
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __and__(self, other):
+        x1, y1, x2, y2 = max(self.x1, other.x1), max(self.y1, other.y1), \
+                         min(self.x2, other.x2), min(self.y2, other.y2)
+                         
+        if self.dimension==other.dimension:
+            samedimension = True
+            dimension = self.dimension
+        elif self.dimension=='ALL' or other.dimension=='ALL':
+            samedimension = True
+            dimension = 'ALL'
+        else:
+            samedimension = False
+        
+        if x1 <= x2 and y1 < y2 and samedimension:
+            return type(self)(x1, y1, x2, y2, dimension)
+
+    def __sub__(self, other):
+        if self.dimension==other.dimension:
+            samedimension = True
+            dimension = self.dimension
+        elif self.dimension=='ALL' or other.dimension=='ALL':
+            samedimension = True
+            dimension = 'ALL'
+        else:
+            samedimension = False
+            
+        intersection = self & other
+        
+        if intersection is None:
+            yield self
+        elif not samedimension:
+            yield self
+        else:
+            x, y = {self.x1, self.x2}, {self.y1, self.y2}
+            if self.x1 < other.x1 < self.x2:
+                x.add(other.x1)
+            if self.y1 < other.y1 < self.y2:
+                y.add(other.y1)
+            if self.x1 < other.x2 < self.x2:
+                x.add(other.x2)
+            if self.y1 < other.y2 < self.y2:
+                y.add(other.y2)
+            for (x1, x2), (y1, y2) in product(pairwise(sorted(x)),
+                                              pairwise(sorted(y))):
+                instance = type(self)(x1, y1, x2, y2, dimension)
+                if instance != intersection:
+                    yield instance
+                    
+    def __or__(self, other):
+        return list(set( list(self - other) + list(other - self) ))
+        
+    def __add__(self,other):
+        intersection = self & other
+        if intersection is None:
+            return [self,other]
+        elif self.x1==0 and other.x1==0 and self.x2==0 and other.x2==0:
+            return [self & other]
+        else:
+            return list(set( list(self - other) + [other] ))
+
+    def __getstate__(self):
+        return self.x1, self.y1, self.x2, self.y2, self.dimension
+
+    def __setstate__(self, state):
+        self.__x1, self.__y1, self.__x2, self.__y2, self.__dimension = state
+
+    @property
+    def x1(self):
+        return self.__x1
+
+    @property
+    def y1(self):
+        return self.__y1
+
+    @property
+    def x2(self):
+        return self.__x2
+
+    @property
+    def y2(self):
+        return self.__y2
+
+    @property
+    def dimension(self):
+        return self.__dimension
+
+    @property
+    def width(self):
+        return self.x2 - self.x1
+
+    @property
+    def height(self):
+        return self.y2 - self.y1
+
+    @property
+    def area(self):
+        return (self.x2-self.x1) * (self.y2-self.y1)
+
+    intersection = __and__
+
+    difference = __sub__
+    
+    symmetric_difference = __or__
+    
+    union = __add__
+
+    data = property(__getstate__)
+
+
+
+class ChoiceSet:
+    """
+    Class representing a choice set
+    """
+    def __init__(self,lst):
+        self.lst = lst
+    
+    def __str__(self):
+        return str(self.lst)
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self,other):
+        return self.lst == other.lst
+        
+    def __add__(self,other):
+        union = {} 
+        if not other.lst:
+            return other,self
+        if isinstance(other,ChoiceSet):
+            if not self.lst:
+                return self,other
+            for a,b in product(self.lst,other.lst):
+                for rect in a+b:
+                    union[rect] = None
+            return BoxSet([]),ChoiceSet(list(union))
+        else:
+            if not self.lst:
+                return other,self
+            for a,b in product(self.lst,other.lst):
+                for rect in a-b:
+                    union[rect] = None
+            return BoxSet([]), ChoiceSet(list(union))
+            
+    def __or__(self,other):
+        sd = []
+        if not self.lst:
+            return other
+        if not other.lst:
+            return self
+        if self.lst == other.lst:
+            return ChoiceSet([])
+                
+        rest_of_a = []
+        for a in self.lst:
+            rest_of_a.append(a)
+            for b in other.lst:
+                toadd = []
+                todel = []
+                for a_prime in rest_of_a:
+                    todel.append(a_prime)
+                    toadd.extend(a_prime - b)
+                for d in todel:
+                    rest_of_a.remove(d)
+                rest_of_a.extend(toadd)
+        
+        sd.extend(rest_of_a)   
+        
+        
+        rest_of_b = []
+        for b in other.lst:
+            rest_of_b.append(b)
+            for a in self.lst:
+                toadd = []
+                todel = []
+                for b_prime in rest_of_b:
+                    todel.append(b_prime)
+                    toadd.extend(b_prime - a)
+                for d in todel:
+                    rest_of_b.remove(d)
+                rest_of_b.extend(toadd)
+        
+        sd.extend(rest_of_b)    
+        
+        return ChoiceSet(list(set(sd)))
+
+
+
+class BoxSet:
+    """
+    Class representing a box set
+    """
+    def __init__(self,lst):
+        self.lst = lst
+    
+    def __str__(self):
+        return str(self.lst)
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self,other):
+        return self.lst == other.lst
+        
+    def __add__(self,other):
+        union = {}            
+        if not other.lst:
+            return self,other
+        if isinstance(other,BoxSet):
+            if not self.lst:
+                return other, ChoiceSet([])
+            for a,b in product(self.lst,other.lst):
+                for rect in a+b:
+                    union[rect] = None
+            return BoxSet(list(union)),ChoiceSet([])
+        else:
+            if not self.lst:
+                return BoxSet([]),other
+            for a,b in product(self.lst,other.lst):
+                for rect in b-a:
+                    union[rect] = None
+            return self, ChoiceSet(list(union))
+            
+    def __or__(self,other):
+        sd = []
+        if not self.lst:
+            return other
+        if not other.lst:
+            return self
+        if self.lst == other.lst:
+            return BoxSet([])
+                
+        
+        rest_of_a = []
+        for a in self.lst:
+            rest_of_a.append(a)
+            for b in other.lst:
+                toadd = []
+                todel = []
+                for a_prime in rest_of_a:
+                    todel.append(a_prime)
+                    toadd.extend(a_prime - b)
+                for d in todel:
+                    rest_of_a.remove(d)
+                rest_of_a.extend(toadd)
+        
+        sd.extend(rest_of_a)   
+        
+        
+        rest_of_b = []
+        for b in other.lst:
+            rest_of_b.append(b)
+            for a in self.lst:
+                toadd = []
+                todel = []
+                for b_prime in rest_of_b:
+                    todel.append(b_prime)
+                    toadd.extend(b_prime - a)
+                for d in todel:
+                    rest_of_b.remove(d)
+                rest_of_b.extend(toadd)
+        
+        sd.extend(rest_of_b)        
+        
+        return BoxSet(list(set(sd)))
+
+
+
+def symmetric_difference_distance(phi1,phi2,rand_area):
+    """
+        Function computing the symmetric difference distance between 2 STL Formulae.
+        Takes as input:
+            * phi1: an STL Formula
+            * phi2: an STL Formula
+            * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+        Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
+    """
+    
+    max_horizon = max(phi1.horizon,phi2.horizon)
+      
+    
+    def area(boxelement):
+        if isinstance(boxelement,Rectangle):
+            return boxelement.area
+        if isinstance(boxelement,ChoiceSet):
+            if boxelement.lst:
+                tmp = 0.0
+                for choicebox in boxelement.lst:
+                    tmp += area(choicebox)
+                return tmp/len(boxelement.lst)
+        if isinstance(boxelement,BoxSet):
+            tmp = 0.0
+            for box in boxelement.lst:
+                tmp += area(box)
+            return tmp
+        return 0.0
+
+    
+    def rec_aos(phi,rand_area,max_horizon):
+        if isinstance(phi, STLFormula.TrueF):
+            return BoxSet([Rectangle(0,0,max_horizon,1,'ALL')]), ChoiceSet([])
+        elif isinstance(phi, STLFormula.FalseF):
+            return BoxSet([Rectangle(0,0,0,0,'ALL')]), ChoiceSet([])
+        elif isinstance(phi, STLFormula.Predicate):
+            if phi.operator == operatorclass.gt or phi.operator == operatorclass.ge:
+                return BoxSet([Rectangle(0,phi.mu/(rand_area[1]-rand_area[0]),0,1,phi.dimension)]), ChoiceSet([])
+            else:
+                return BoxSet([Rectangle(0,0,0,phi.mu/(rand_area[1]-rand_area[0]),phi.dimension)]), ChoiceSet([])
+        elif isinstance(phi, STLFormula.Conjunction):
+            p1_box, p1_choice = rec_aos(phi.first_formula,rand_area,max_horizon)
+            p2_box, p2_choice = rec_aos(phi.second_formula,rand_area,max_horizon)
+            
+            p_box,_ = p1_box+p2_box
+            _,p_choice = p1_choice+p2_choice
+            
+            union_box, union_choice = p_box + p_choice
+
+            return union_box, union_choice
+            
+        elif isinstance(phi, STLFormula.Disjunction):
+            p1_box, p1_choice = rec_aos(phi.first_formula,rand_area,max_horizon)
+            p2_box, p2_choice = rec_aos(phi.second_formula,rand_area,max_horizon)
+            
+            union_choice = {}
+            for a,b in product(p1_box.lst,p2_box.lst):
+                for rect in a+b:
+                    union_choice[rect] = None
+            for a,b in product(list(union_choice),p1_choice.lst):
+                for rect in a+b:
+                    union_choice[rect] = None
+            for a,b in product(list(union_choice),p2_choice.lst):
+                for rect in a+b:
+                    union_choice[rect] = None
+            
+            return BoxSet([]), ChoiceSet(list(union_choice))
+        elif isinstance(phi, STLFormula.Always):
+            d_box = []
+            d_choice = []
+            p1_box, p1_choice = rec_aos(phi.formula,rand_area,max_horizon)
+            for b in p1_box.lst:
+                d_box.append(Rectangle(b.x1+phi.t1,b.y1,b.x2+phi.t2,b.y2,b.dimension))
+            for b in p1_choice.lst:
+                d_choice.append(Rectangle(b.x1+phi.t1,b.y1,b.x2+phi.t2,b.y2,b.dimension))
+            return BoxSet(d_box), ChoiceSet(d_choice) 
+        elif isinstance(phi, STLFormula.Eventually):
+            p1_box, p1_choice = rec_aos(phi.formula,rand_area,max_horizon)
+
+            union_choice = {}
+            if not p1_box.lst:
+                union_choice = p1_choice.lst
+            elif not p1_choice.lst:
+                union_choice = p1_box.lst
+            else:
+                for a,b in product(p1_box.lst,p1_choice.lst):
+                    for rect in a+b:
+                        union_choice[rect] = None
+            
+            d = []
+            for b in union_choice:
+                for i in range(phi.t1,phi.t2):
+                    d.append(Rectangle(b.x1+i,b.y1,b.x2+i+1,b.y2,b.dimension))
+                    
+            return BoxSet([]), ChoiceSet(d)                    
+
+    
+    b1_box, b1_choice = rec_aos(phi1,rand_area,max_horizon)
+    b2_box, b2_choice = rec_aos(phi2,rand_area,max_horizon)
+    
+
+    if b1_box == b2_box and b1_choice == b2_choice:
+        return 0.0
+    
+    sd_box = b1_box | b2_box
+    sd_choice = b1_choice | b2_choice
+    
+    bs = []
+    for c1 in b1_choice.lst:
+        cs = []
+        for c2 in b2_choice.lst:
+            cs.append(BoxSet(c1 | c2))
+        bs.append(ChoiceSet(cs))
+    boxchoice = ChoiceSet(bs)
+
+    
+    if not sd_box.lst:
+        sd = sd_choice
+    elif not sd_choice.lst:
+        sd = sd_box
+    else:
+        boxsets = []
+        for choice in sd_choice.lst:
+            boxsets.append(BoxSet([choice]) | sd_box)
+        sd = ChoiceSet(boxsets)
+        
+    sd = BoxSet([sd,boxchoice])
+
+    return round(area(sd)/max_horizon,5)
+
+
+
+
+
 
 
 
@@ -325,7 +768,7 @@ if __name__ == '__main__':
     phi1 = STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20)
     phi2 = STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt044),0,20)
     phi3 = STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20)
-    phi4 = STLFormula.Conjunction(STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20),STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt044),0,20))
+    phi4 = STLFormula.Conjunction(STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20),STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,20))
     phi5 = STLFormula.Conjunction(STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,10),STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt044),12,20))
     phi6 = STLFormula.Always(STLFormula.Eventually(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt04),0,4),0,16)
     true = STLFormula.TrueF()
@@ -334,48 +777,98 @@ if __name__ == '__main__':
     #Reproduces the results of Madsen et al. (2018)
     rand_area = [0,1]
     
-    print('d(True,phi1)',pompeiu_hausdorff_distance(true,phi1,rand_area),'(0.6)')
-    print('d(phi1,phi1)',pompeiu_hausdorff_distance(phi1,phi1,rand_area),'(0.0)')
-    print('d(phi1,phi2)',pompeiu_hausdorff_distance(phi1,phi2,rand_area),'(0.04)')
-    print('d(phi1,phi3)',pompeiu_hausdorff_distance(phi1,phi3,rand_area),'(0.6)')
-    print('d(phi1,phi4)',pompeiu_hausdorff_distance(phi1,phi4,rand_area),'(0.0)')
-    print('d(phi1,phi5)',pompeiu_hausdorff_distance(phi1,phi5,rand_area),'(0.6)')
-    print('d(phi1,phi6)',pompeiu_hausdorff_distance(phi1,phi6,rand_area),'(0.6)')
+    #Symetric Difference    
+    print('sd(True,phi1)',symmetric_difference_distance(true,phi1,rand_area),'(0.8)')
+    print('sd(phi1,phi1)',symmetric_difference_distance(phi1,phi1,rand_area),'(0.0)')
+    print('sd(phi1,phi2)',symmetric_difference_distance(phi1,phi2,rand_area),'(0.04)')
+    print('sd(phi1,phi3)',symmetric_difference_distance(phi1,phi3,rand_area),'(0.19)')
+    print('sd(phi1,phi4)',symmetric_difference_distance(phi1,phi4,rand_area),'(0.0)')
+    print('sd(phi1,phi5)',symmetric_difference_distance(phi1,phi5,rand_area),'(0.036)')
+    print('sd(phi1,phi6)',symmetric_difference_distance(phi1,phi6,rand_area),'(0.03)')
 
     print('')
 
-    print('d(True,phi2)',pompeiu_hausdorff_distance(true,phi2,rand_area),'(0.56)')
-    print('d(phi2,phi2)',pompeiu_hausdorff_distance(phi2,phi2,rand_area),'(0.0)')
-    print('d(phi2,phi3)',pompeiu_hausdorff_distance(phi2,phi3,rand_area),'(0.56)')
-    print('d(phi2,phi4)',pompeiu_hausdorff_distance(phi2,phi4,rand_area),'(0.04)')
-    print('d(phi2,phi5)',pompeiu_hausdorff_distance(phi2,phi5,rand_area),'(0.56)')
-    print('d(phi2,phi6)',pompeiu_hausdorff_distance(phi2,phi6,rand_area),'(0.56)')
+    print('sd(True,phi2)',symmetric_difference_distance(true,phi2,rand_area),'(0.76)')
+    print('sd(phi2,phi2)',symmetric_difference_distance(phi2,phi2,rand_area),'(0.0)')
+    print('sd(phi2,phi3)',symmetric_difference_distance(phi2,phi3,rand_area),'(0.23)')
+    print('sd(phi2,phi4)',symmetric_difference_distance(phi2,phi4,rand_area),'(0.04)')
+    print('sd(phi2,phi5)',symmetric_difference_distance(phi2,phi5,rand_area),'(0.044)')
+    print('sd(phi2,phi6)',symmetric_difference_distance(phi2,phi6,rand_area),'(0.07)')
 
     print('')
 
-    print('d(True,phi3)',pompeiu_hausdorff_distance(true,phi3,rand_area),'(0.6)')
-    print('d(phi3,phi3)',pompeiu_hausdorff_distance(phi3,phi3,rand_area),'(0.0)')
-    print('d(phi3,phi4)',pompeiu_hausdorff_distance(phi3,phi4,rand_area),'(0.6)')
-    print('d(phi3,phi5)',pompeiu_hausdorff_distance(phi3,phi5,rand_area),'(0.6)')
-    print('d(phi3,phi6)',pompeiu_hausdorff_distance(phi3,phi6,rand_area),'(0.6)')
+    print('sd(True,phi3)',symmetric_difference_distance(true,phi3,rand_area),'(0.99)')
+    print('sd(phi3,phi3)',symmetric_difference_distance(phi3,phi3,rand_area),'(0.0)')
+    print('sd(phi3,phi4)',symmetric_difference_distance(phi3,phi4,rand_area),'(0.19)')
+    print('sd(phi3,phi5)',symmetric_difference_distance(phi3,phi5,rand_area),'(0.188)')
+    print('sd(phi3,phi6)',symmetric_difference_distance(phi3,phi6,rand_area),'(0.16)')
+    # exit()
+    print('')
+
+    print('sd(True,phi4)',symmetric_difference_distance(true,phi4,rand_area),'(0.8)')
+    print('sd(phi4,phi4)',symmetric_difference_distance(phi4,phi4,rand_area),'(0.0)')
+    print('sd(phi4,phi5)',symmetric_difference_distance(phi4,phi5,rand_area),'(0.036)')
+    print('sd(phi4,phi6)',symmetric_difference_distance(phi4,phi6,rand_area),'(0.03)')
 
     print('')
 
-    print('d(True,phi4)',pompeiu_hausdorff_distance(true,phi4,rand_area),'(0.6)')
-    print('d(phi4,phi4)',pompeiu_hausdorff_distance(phi4,phi4,rand_area),'(0.0)')
-    print('d(phi4,phi5)',pompeiu_hausdorff_distance(phi4,phi5,rand_area),'(0.6)')
-    print('d(phi4,phi6)',pompeiu_hausdorff_distance(phi4,phi6,rand_area),'(0.6)')
+    print('sd(True,phi5)',symmetric_difference_distance(true,phi5,rand_area),'(0.804)')
+    print('sd(phi5,phi5)',symmetric_difference_distance(phi5,phi5,rand_area),'(0.0)')
+    print('sd(phi5,phi6)',symmetric_difference_distance(phi5,phi6,rand_area),'(0.066)')
 
     print('')
 
-    print('d(True,phi5)',pompeiu_hausdorff_distance(true,phi5,rand_area),'(0.6)')
-    print('d(phi5,phi5)',pompeiu_hausdorff_distance(phi5,phi5,rand_area),'(0.0)')
-    print('d(phi5,phi6)',pompeiu_hausdorff_distance(phi5,phi6,rand_area),'(0.6)')
+    print('sd(True,phi6)',symmetric_difference_distance(true,phi6,rand_area),'(0.83)')
+    print('sd(phi6,phi6)',symmetric_difference_distance(phi6,phi6,rand_area),'(0.0)')    
+    
+    
+    print('')
+    print('')
+    # exit()
+    
+    #Pompeiu-Hausdorff
+    print('ph(True,phi1)',pompeiu_hausdorff_distance(true,phi1,rand_area),'(0.6)')
+    print('ph(phi1,phi1)',pompeiu_hausdorff_distance(phi1,phi1,rand_area),'(0.0)')
+    print('ph(phi1,phi2)',pompeiu_hausdorff_distance(phi1,phi2,rand_area),'(0.04)')
+    print('ph(phi1,phi3)',pompeiu_hausdorff_distance(phi1,phi3,rand_area),'(0.6)')
+    print('ph(phi1,phi4)',pompeiu_hausdorff_distance(phi1,phi4,rand_area),'(0.0)')
+    print('ph(phi1,phi5)',pompeiu_hausdorff_distance(phi1,phi5,rand_area),'(0.6)')
+    print('ph(phi1,phi6)',pompeiu_hausdorff_distance(phi1,phi6,rand_area),'(0.6)')
 
     print('')
 
-    print('d(True,phi6)',pompeiu_hausdorff_distance(true,phi6,rand_area),'(0.6)')
-    print('d(phi6,phi6)',pompeiu_hausdorff_distance(phi6,phi6,rand_area),'(0.0)')
+    print('ph(True,phi2)',pompeiu_hausdorff_distance(true,phi2,rand_area),'(0.56)')
+    print('ph(phi2,phi2)',pompeiu_hausdorff_distance(phi2,phi2,rand_area),'(0.0)')
+    print('ph(phi2,phi3)',pompeiu_hausdorff_distance(phi2,phi3,rand_area),'(0.56)')
+    print('ph(phi2,phi4)',pompeiu_hausdorff_distance(phi2,phi4,rand_area),'(0.04)')
+    print('ph(phi2,phi5)',pompeiu_hausdorff_distance(phi2,phi5,rand_area),'(0.56)')
+    print('ph(phi2,phi6)',pompeiu_hausdorff_distance(phi2,phi6,rand_area),'(0.56)')
+
+    print('')
+
+    print('ph(True,phi3)',pompeiu_hausdorff_distance(true,phi3,rand_area),'(0.6)')
+    print('ph(phi3,phi3)',pompeiu_hausdorff_distance(phi3,phi3,rand_area),'(0.0)')
+    print('ph(phi3,phi4)',pompeiu_hausdorff_distance(phi3,phi4,rand_area),'(0.6)')
+    print('ph(phi3,phi5)',pompeiu_hausdorff_distance(phi3,phi5,rand_area),'(0.6)')
+    print('ph(phi3,phi6)',pompeiu_hausdorff_distance(phi3,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('ph(True,phi4)',pompeiu_hausdorff_distance(true,phi4,rand_area),'(0.6)')
+    print('ph(phi4,phi4)',pompeiu_hausdorff_distance(phi4,phi4,rand_area),'(0.0)')
+    print('ph(phi4,phi5)',pompeiu_hausdorff_distance(phi4,phi5,rand_area),'(0.6)')
+    print('ph(phi4,phi6)',pompeiu_hausdorff_distance(phi4,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('ph(True,phi5)',pompeiu_hausdorff_distance(true,phi5,rand_area),'(0.6)')
+    print('ph(phi5,phi5)',pompeiu_hausdorff_distance(phi5,phi5,rand_area),'(0.0)')
+    print('ph(phi5,phi6)',pompeiu_hausdorff_distance(phi5,phi6,rand_area),'(0.6)')
+
+    print('')
+
+    print('ph(True,phi6)',pompeiu_hausdorff_distance(true,phi6,rand_area),'(0.6)')
+    print('ph(phi6,phi6)',pompeiu_hausdorff_distance(phi6,phi6,rand_area),'(0.0)')
     
     
     print('')
@@ -405,9 +898,9 @@ if __name__ == '__main__':
 
     rand_area = [0,4]
 
-    print(pompeiu_hausdorff_distance(true,phi_target,rand_area))
-    print(pompeiu_hausdorff_distance(phi_hypothesis,phi_target,rand_area))
-    print(pompeiu_hausdorff_distance(eventually1,eventually2,rand_area))
+    print(pompeiu_hausdorff_distance(true,phi_target,rand_area),symmetric_difference_distance(true,phi_target,rand_area),)
+    print(pompeiu_hausdorff_distance(phi_hypothesis,phi_target,rand_area),symmetric_difference_distance(phi_hypothesis,phi_target,rand_area))
+    print(pompeiu_hausdorff_distance(eventually1,eventually2,rand_area),symmetric_difference_distance(eventually1,eventually2,rand_area))
 
 
     

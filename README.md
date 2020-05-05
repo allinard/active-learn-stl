@@ -118,8 +118,11 @@ phi2 = STLFormula.Always(STLFormula.Conjunction(predicate_x_ge02,predicate_x_lt0
 
 pompeiu_hausdorff_distance(phi1,phi2,rand_area)
 0.04
+
+symmetric_difference_distance(phi1,phi3,rand_area)
+0.19
 ```
-where `pompeiu_hausdorff_distance` takes as input:
+where `pompeiu_hausdorff_distance` and `symmetric_difference_distance` takes as input:
 * `phi1`: an STL Formula
 * `phi2`: an STL Formula
 * `rand_area`: the domain on which signals are generated. `rand_area = [lb,ub]` where `lb` is the lower bound and `ub` the upper bound of the domain.
