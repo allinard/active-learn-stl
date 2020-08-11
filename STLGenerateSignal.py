@@ -13,19 +13,16 @@ M = 100000
 M_up = 100000
 M_low = 0.000001
 
-#HARDCODED
-#TODO: manage more dimensions
-NB_DIMENSIONS = 2
 
 
-
-def generate_signal_milp_quantitative(phi,start,rand_area,U,epsilon,OPTIMIZE_ROBUSTNESS):
+def generate_signal_milp_quantitative(phi,start,rand_area,dimensions,U,epsilon,OPTIMIZE_ROBUSTNESS):
     """
         Function generating a signal satisfying an STL Formula.
         Takes as input:
             * phi: an STL Formula
-            * start: a vector of the form [x0,y0] for the starting point coordinates
+            * start: a vector of the form [x0,y0,...] for the starting point coordinates
             * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+            * dimensions: the dimensions on which the STLFormula is defined, e.g. dimensions=['x','y'].
             * U: a basic control policy standing for how much can move in 1 time stamp, i.e. \forall t \in [0,T], |s[t]-s[t+1]| < U \pm \epsilon 
             * epsilon: basic control policy parameter
             * OPTIMIZE_ROBUSTNESS: a flag whether the robustness of the generated signal w.r.t. phi has to be maximized or not
@@ -46,11 +43,11 @@ def generate_signal_milp_quantitative(phi,start,rand_area,U,epsilon,OPTIMIZE_ROB
     
 
     #We want to optimize a signal. The lower and upperbounds are specified by the random area.
-    s = plp.LpVariable.dicts("s",(range(phi.horizon+1),range(NB_DIMENSIONS)),rand_area[0],rand_area[1],plp.LpContinuous)
+    s = plp.LpVariable.dicts("s",(range(phi.horizon+1),range(len(dimensions))),rand_area[0],rand_area[1],plp.LpContinuous)
 
     #the start is specified
-    opt_model += s[0][0] == start[0]
-    opt_model += s[0][1] == start[1]
+    for dim in range(len(dimensions)):
+        opt_model += s[0][dim] == start[dim]
     
     #basic control policy, i.e. how much can move in 1 time stamp
     #\forall t \in [0,T], |s[t]-s[t+1]| < U \pm \epsilon 
@@ -204,19 +201,20 @@ def generate_signal_milp_quantitative(phi,start,rand_area,U,epsilon,OPTIMIZE_ROB
     if s[0][0].varValue == None:
         raise Exception("")
     
-    return [[s[j][i].varValue for i in range(NB_DIMENSIONS)] for j in range(phi.horizon+1)]
+    return [[s[j][i].varValue for i in range(len(dimensions))] for j in range(phi.horizon+1)]
     
     
     
 
 
-def generate_signal_milp_boolean(phi,start,rand_area,U,epsilon):
+def generate_signal_milp_boolean(phi,start,rand_area,dimensions,U,epsilon):
     """
         Function generating a signal satisfying an STL Formula.
         Takes as input:
             * phi: an STL Formula
-            * start: a vector of the form [x0,y0] for the starting point coordinates
+            * start: a vector of the form [x0,y0,...] for the starting point coordinates
             * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+            * dimensions: the dimensions on which the STLFormula is defined, e.g. dimensions=['x','y'].
             * U: a basic control policy standing for how much can move in 1 time stamp, i.e. \forall t \in [0,T], |s[t]-s[t+1]| < U \pm \epsilon 
             * epsilon: basic control policy parameter
         The encoding details of the MILP optimization problem follows the boolean enconding of Raman et al., "Model  predictive  control  with  signaltemporal logic specifications" in 53rd IEEE Conference on Decision and Control. IEEE, 2014, pp. 81–87.
@@ -231,11 +229,11 @@ def generate_signal_milp_boolean(phi,start,rand_area,U,epsilon):
   
             
     #We want to optimize a signal. The lower and upperbounds are specified by the random area.
-    s = plp.LpVariable.dicts("s",(range(phi.horizon+1),range(NB_DIMENSIONS)),rand_area[0],rand_area[1],plp.LpContinuous)
+    s = plp.LpVariable.dicts("s",(range(phi.horizon+1),range(len(dimensions))),rand_area[0],rand_area[1],plp.LpContinuous)
        
     #the start is specified
-    opt_model += s[0][0] == start[0]
-    opt_model += s[0][1] == start[1]
+    for dim in range(len(dimensions)):
+        opt_model += s[0][dim] == start[dim]
     
     #control policy
     for t in range(0,phi.horizon):
@@ -364,7 +362,7 @@ def generate_signal_milp_boolean(phi,start,rand_area,U,epsilon):
         
     opt_model.solve(plp.GUROBI_CMD(msg=False))
     
-    return [[s[j][i].varValue for i in range(NB_DIMENSIONS)] for j in range(phi.horizon+1)]
+    return [[s[j][i].varValue for i in range(len(dimensions))] for j in range(phi.horizon+1)]
 
     
     
@@ -375,6 +373,7 @@ if __name__ == '__main__':
     #CONSTANTS
     INDEX_X = 0
     INDEX_Y = 1
+    dimensions = ['x','y']
 
     #Definition of STL Formulae
     predicate_x_gt0 = STLFormula.Predicate('x',operatorclass.gt,0,INDEX_X)
@@ -402,9 +401,9 @@ if __name__ == '__main__':
     epsilon = 0.05
     
     #generation of 3 trajectories (quantitative no maximization, quantitative with maximization, boolean)
-    trajectory1 = generate_signal_milp_quantitative(phi_nnf,start,rand_area,U,epsilon,False)
-    trajectory2 = generate_signal_milp_quantitative(phi_nnf,start,rand_area,U,epsilon,True)
-    trajectory3 = generate_signal_milp_boolean(phi_nnf,start,rand_area,U,epsilon)
+    trajectory1 = generate_signal_milp_quantitative(phi_nnf,start,rand_area,dimensions,U,epsilon,False)
+    trajectory2 = generate_signal_milp_quantitative(phi_nnf,start,rand_area,dimensions,U,epsilon,True)
+    trajectory3 = generate_signal_milp_boolean(phi_nnf,start,rand_area,dimensions,U,epsilon)
 
     #Plot
     plt.clf()

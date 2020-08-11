@@ -18,7 +18,8 @@ class STLActiveLearn:
         Takes as input:
             * phi_target: the target specification to learn
             * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
-            * start: a vector of the form [x0,y0] for the starting point coordinates
+            * dimensions: the dimensions on which the STL formula to learn is defined, e.g. dimensions=['x','y'].
+            * start: a vector of the form [x0,y0,...] for the starting point coordinates
             * max_horizon: the maximum horizon of the STL Formula to learn
             * primitives (optional): either 'MOTION_PLANNING' or 'CLASSICAL' (default set to 'CLASSICAL')
             * signal_gen (optional): the signal generation method given an STL Formula. Either 'BOOLEAN' or 'QUANTITATIVE' or 'QUANTITATIVE_OPTIMIZE' (default set to 'QUANTITATIVE_OPTIMIZE')
@@ -33,7 +34,7 @@ class STLActiveLearn:
         Attributes:
             * dtlearn: decision tree for STL Formula learning 
     """    
-    def __init__(self,phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=100,phi_hypothesis=STLFormula.TrueF(),plot_activated=False):
+    def __init__(self,phi_target,rand_area,dimensions,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=100,phi_hypothesis=STLFormula.TrueF(),plot_activated=False):
 
         #Instance of the DT learning algorithm
         self.dtlearn = DTLearn(rand_area,max_horizon,primitives=primitives)
@@ -73,7 +74,7 @@ class STLActiveLearn:
                 #translate hypothesis into negation normal form
                 phi_hypothesis_nnf = STLFormula.toNegationNormalForm(phi_hypothesis,False)
                 #compute distance between hypothesis and target
-                distance = pompeiu_hausdorff_distance(phi_hypothesis_nnf,phi_target,rand_area)
+                distance = pompeiu_hausdorff_distance(phi_hypothesis_nnf,phi_target,rand_area,dimensions)
                 #generate counterexample
                 if distance > alpha:
                     #compute symmetric difference of target and hypothesis
@@ -82,18 +83,18 @@ class STLActiveLearn:
                     #compute signal
                     try:
                         if signal_gen=='QUANTITATIVE_OPTIMIZE':
-                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,True)
+                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,dimensions,U,epsilon,True)
                         elif signal_gen=='QUANTITATIVE':
-                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,U,epsilon,False)
+                            signal = generate_signal_milp_quantitative(xor_nnf,start,rand_area,dimensions,U,epsilon,False)
                         else:
-                            signal = generate_signal_milp_boolean(xor_nnf,start,rand_area,U,epsilon)
+                            signal = generate_signal_milp_boolean(xor_nnf,start,rand_area,dimensions,U,epsilon)
                     except Exception:
                         if signal_gen=='QUANTITATIVE_OPTIMIZE':
-                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,U,epsilon,True)
+                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,dimensions,U,epsilon,True)
                         elif signal_gen=='QUANTITATIVE':
-                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,U,epsilon,False)
+                            signal = generate_signal_milp_quantitative(phi_target,start,rand_area,dimensions,U,epsilon,False)
                         else:
-                            signal = generate_signal_milp_boolean(phi_target,start,rand_area,U,epsilon)
+                            signal = generate_signal_milp_boolean(phi_target,start,rand_area,dimensions,U,epsilon)
                     #let the teacher evaluate    
                     ro = round(phi_target.robustness(signal,0), 5)
                     print("robustness signal: ",ro)
@@ -119,7 +120,7 @@ class STLActiveLearn:
                     #retrieve hypothesis
                     phi_hypothesis = self.dtlearn.toSTLformula()
                     print("hypothesis: ",STLFormula.simplify_dtlearn(phi_hypothesis))
-                    distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area)
+                    distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area,dimensions)
                     print("distance: ",distance)
                 #if distance < alpha, then the hypothesis and the target are considered equivalent. termination of algorithm.
                 else:
@@ -143,13 +144,13 @@ class STLActiveLearn:
                     #compute signal
                     if signal_gen=='QUANTITATIVE_OPTIMIZE':
                         if isinstance(phi_hypothesis,STLFormula.TrueF):
-                            signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,U,epsilon,False)
+                            signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,dimensions,U,epsilon,False)
                         else:
-                            signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,U,epsilon,True)
+                            signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,dimensions,U,epsilon,True)
                     elif signal_gen=='QUANTITATIVE':
-                        signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,U,epsilon,False)
+                        signal = generate_signal_milp_quantitative(phi_hypothesis_nnf,start,rand_area,dimensions,U,epsilon,False)
                     else:
-                        signal = generate_signal_milp_boolean(phi_hypothesis_nnf,start,rand_area,U,epsilon)    
+                        signal = generate_signal_milp_boolean(phi_hypothesis_nnf,start,rand_area,dimensions,U,epsilon)    
                 #If the signal cannot be generated (for instance, if the constraint solver can not provide any signal satisfying the hypothesis), then reset the hypothesis to True or to prior knowledge
                 except Exception:
                     if prior_knowledge:
@@ -196,7 +197,7 @@ class STLActiveLearn:
                 #retrieve hypothesis
                 phi_hypothesis = self.dtlearn.toSTLformula()
                 print("hypothesis: ",STLFormula.simplify_dtlearn(phi_hypothesis))
-                distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area)
+                distance = pompeiu_hausdorff_distance(STLFormula.toNegationNormalForm(phi_hypothesis,False),phi_target,rand_area,dimensions)
                 print("distance: ",distance)
 
 
@@ -241,6 +242,7 @@ if __name__ == '__main__':
     max_horizon = 30
     INDEX_X = 0
     INDEX_Y = 1
+    dimensions = ['x','y']
 
     #Define STL Formulae
     predicate_x_gt3 = STLFormula.Predicate('x',operatorclass.gt,3,INDEX_X)
@@ -299,11 +301,11 @@ if __name__ == '__main__':
     
     
     #Instatiate the Active Learning algorithm
-    active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=200,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
+    active_learn = STLActiveLearn(phi_target,rand_area,dimensions,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=200,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
     
     print("\n\n Done ")
     
     print(active_learn.dtlearn.simple_boolean())
-    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(active_learn.dtlearn.toSTLformula(),False),rand_area))
+    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(active_learn.dtlearn.toSTLformula(),False),rand_area,dimensions))
 
     exit()

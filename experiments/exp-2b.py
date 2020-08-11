@@ -17,6 +17,7 @@ if __name__ == '__main__':
 
     #Constants
     rand_area = [0,4]
+    dimensions = ['x','y']
     start=[0, 0]
     max_horizon = 30
     INDEX_X = 0
@@ -80,13 +81,13 @@ if __name__ == '__main__':
     #Instatiate the Active Learning algorithm
     begintime = time.time()
     # active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=1000,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
-    active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=1000,phi_hypothesis=mission,plot_activated=True)
+    active_learn = STLActiveLearn(phi_target,rand_area,dimensions,start,max_horizon,primitives='CLASSICAL',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=1000,phi_hypothesis=mission,plot_activated=True)
     # active_learn = STLActiveLearn(phi_target,rand_area,start,max_horizon,primitives='MOTION_PLANNING',signal_gen='QUANTITATIVE_OPTIMIZE',U=0.2,epsilon=0.05,alpha=0.01,beta=0.5,gamma=50,MAX_IT=1000,phi_hypothesis=STLFormula.TrueF(),plot_activated=True)
     
     print("\n\n Done ")
     
     print(active_learn.dtlearn.simple_boolean())
-    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(active_learn.dtlearn.toSTLformula(),False),rand_area))
+    print('distance between target and retrieved hypothesis',pompeiu_hausdorff_distance(phi_target,STLFormula.toNegationNormalForm(active_learn.dtlearn.toSTLformula(),False),rand_area,dimensions))
     endtime = time.time()
     pos = open("pos.pickle",'wb')
     neg = open("neg.pickle",'wb')

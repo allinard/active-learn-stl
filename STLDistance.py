@@ -9,18 +9,15 @@ import copy
 M_up = 100000
 M_low = 0.000001
 
-#HARDCODED
-#TODO: manage more dimensions
-NB_DIMENSIONS = 2
 
-
-def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
+def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area,dimensions):
     """
         Function computing the directed pompeiu-hausdorff distance between 2 STL Formulae.
         Takes as input:
             * phi1: an STL Formula
             * phi2: an STL Formula
             * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+            * dimensions: the dimensions on which the 2 STLFormulae are defined, e.g. dimensions=['x','y'].
         Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
         The encoding details of the MILP optimization problem follow Raman et al., "Model  predictive  control  with  signaltemporal logic specifications,” in 53rd IEEE Conference on Decision and Control. IEEE, 2014, pp. 81–87.
     """
@@ -43,7 +40,7 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
             
     #We want to optimize a signal. The lower and upperbounds are specified by the random area.
-    s = plp.LpVariable.dicts("s",(range(max(phi1.horizon,phi2.horizon)+1),range(NB_DIMENSIONS)),rand_area[0],rand_area[1],plp.LpContinuous)    
+    s = plp.LpVariable.dicts("s",(range(max(phi1.horizon,phi2.horizon)+1),range(len(dimensions))),rand_area[0],rand_area[1],plp.LpContinuous)    
        
        
     #recursive function
@@ -292,16 +289,17 @@ def directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area):
 
 
 
-def pompeiu_hausdorff_distance(phi1,phi2,rand_area):
+def pompeiu_hausdorff_distance(phi1,phi2,rand_area,dimensions):
     """
         Function computing the pompeiu-hausdorff distance between 2 STL Formulae.
         Takes as input:
             * phi1: an STL Formula
             * phi2: an STL Formula
             * rand_area: the domain on which signals are generated. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
+            * dimensions: the dimensions on which the 2 STLFormulae are defined, e.g. dimensions=['x','y'].
         Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
     """
-    return round(max(directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area),directed_pompeiu_hausdorff_distance(phi2,phi1,rand_area)),5)
+    return round(max(directed_pompeiu_hausdorff_distance(phi1,phi2,rand_area,dimensions),directed_pompeiu_hausdorff_distance(phi2,phi1,rand_area,dimensions)),5)
 
 
 
@@ -879,12 +877,12 @@ def symmetric_difference_distance(phi1,phi2,rand_area,dimensions):
             * phi1: an STL Formula
             * phi2: an STL Formula
             * rand_area: the domain on which signals are defined. rand_area = [lb,ub] where lb is the lower bound and ub the upper bound of the domain.
-            * dimensions: the dimensions on which the 2 STLFormulae are defined, e.g. dimensions=['x','y','t'].
+            * dimensions: the dimensions on which the 2 STLFormulae are defined, e.g. dimensions=['x','y'].
         Follows the definition of Madsen et al., "Metrics  for  signal temporal logic formulae," in 2018 IEEE Conference on Decision andControl (CDC). pp. 1542–1547
     """
     
     max_horizon = max(phi1.horizon,phi2.horizon)
-      
+    dimensions = dimensions+['t']
     
     def area(boxelement):
         if isinstance(boxelement,N_Cuboid):
@@ -1308,7 +1306,7 @@ if __name__ == '__main__':
 
     #Reproduces the results of Madsen et al. (2018)
     rand_area = [0,1]
-    dimensions = ['x','t']
+    dimensions = ['x']
     
     #Symetric Difference    
     print('sd(True,phi1)',symmetric_difference_distance(true,phi1,rand_area,dimensions),'(0.8)')
@@ -1360,48 +1358,48 @@ if __name__ == '__main__':
     
     
     # #Pompeiu-Hausdorff
-    print('ph(True,phi1)',pompeiu_hausdorff_distance(true,phi1,rand_area),'(0.6)')
-    print('ph(phi1,phi1)',pompeiu_hausdorff_distance(phi1,phi1,rand_area),'(0.0)')
-    print('ph(phi1,phi2)',pompeiu_hausdorff_distance(phi1,phi2,rand_area),'(0.04)')
-    print('ph(phi1,phi3)',pompeiu_hausdorff_distance(phi1,phi3,rand_area),'(0.6)')
-    print('ph(phi1,phi4)',pompeiu_hausdorff_distance(phi1,phi4,rand_area),'(0.0)')
-    print('ph(phi1,phi5)',pompeiu_hausdorff_distance(phi1,phi5,rand_area),'(0.6)')
-    print('ph(phi1,phi6)',pompeiu_hausdorff_distance(phi1,phi6,rand_area),'(0.6)')
+    print('ph(True,phi1)',pompeiu_hausdorff_distance(true,phi1,rand_area,dimensions),'(0.6)')
+    print('ph(phi1,phi1)',pompeiu_hausdorff_distance(phi1,phi1,rand_area,dimensions),'(0.0)')
+    print('ph(phi1,phi2)',pompeiu_hausdorff_distance(phi1,phi2,rand_area,dimensions),'(0.04)')
+    print('ph(phi1,phi3)',pompeiu_hausdorff_distance(phi1,phi3,rand_area,dimensions),'(0.6)')
+    print('ph(phi1,phi4)',pompeiu_hausdorff_distance(phi1,phi4,rand_area,dimensions),'(0.0)')
+    print('ph(phi1,phi5)',pompeiu_hausdorff_distance(phi1,phi5,rand_area,dimensions),'(0.6)')
+    print('ph(phi1,phi6)',pompeiu_hausdorff_distance(phi1,phi6,rand_area,dimensions),'(0.6)')
 
     print('')
 
-    print('ph(True,phi2)',pompeiu_hausdorff_distance(true,phi2,rand_area),'(0.56)')
-    print('ph(phi2,phi2)',pompeiu_hausdorff_distance(phi2,phi2,rand_area),'(0.0)')
-    print('ph(phi2,phi3)',pompeiu_hausdorff_distance(phi2,phi3,rand_area),'(0.56)')
-    print('ph(phi2,phi4)',pompeiu_hausdorff_distance(phi2,phi4,rand_area),'(0.04)')
-    print('ph(phi2,phi5)',pompeiu_hausdorff_distance(phi2,phi5,rand_area),'(0.56)')
-    print('ph(phi2,phi6)',pompeiu_hausdorff_distance(phi2,phi6,rand_area),'(0.56)')
+    print('ph(True,phi2)',pompeiu_hausdorff_distance(true,phi2,rand_area,dimensions),'(0.56)')
+    print('ph(phi2,phi2)',pompeiu_hausdorff_distance(phi2,phi2,rand_area,dimensions),'(0.0)')
+    print('ph(phi2,phi3)',pompeiu_hausdorff_distance(phi2,phi3,rand_area,dimensions),'(0.56)')
+    print('ph(phi2,phi4)',pompeiu_hausdorff_distance(phi2,phi4,rand_area,dimensions),'(0.04)')
+    print('ph(phi2,phi5)',pompeiu_hausdorff_distance(phi2,phi5,rand_area,dimensions),'(0.56)')
+    print('ph(phi2,phi6)',pompeiu_hausdorff_distance(phi2,phi6,rand_area,dimensions),'(0.56)')
 
     print('')
 
-    print('ph(True,phi3)',pompeiu_hausdorff_distance(true,phi3,rand_area),'(0.6)')
-    print('ph(phi3,phi3)',pompeiu_hausdorff_distance(phi3,phi3,rand_area),'(0.0)')
-    print('ph(phi3,phi4)',pompeiu_hausdorff_distance(phi3,phi4,rand_area),'(0.6)')
-    print('ph(phi3,phi5)',pompeiu_hausdorff_distance(phi3,phi5,rand_area),'(0.6)')
-    print('ph(phi3,phi6)',pompeiu_hausdorff_distance(phi3,phi6,rand_area),'(0.6)')
+    print('ph(True,phi3)',pompeiu_hausdorff_distance(true,phi3,rand_area,dimensions),'(0.6)')
+    print('ph(phi3,phi3)',pompeiu_hausdorff_distance(phi3,phi3,rand_area,dimensions),'(0.0)')
+    print('ph(phi3,phi4)',pompeiu_hausdorff_distance(phi3,phi4,rand_area,dimensions),'(0.6)')
+    print('ph(phi3,phi5)',pompeiu_hausdorff_distance(phi3,phi5,rand_area,dimensions),'(0.6)')
+    print('ph(phi3,phi6)',pompeiu_hausdorff_distance(phi3,phi6,rand_area,dimensions),'(0.6)')
 
     print('')
 
-    print('ph(True,phi4)',pompeiu_hausdorff_distance(true,phi4,rand_area),'(0.6)')
-    print('ph(phi4,phi4)',pompeiu_hausdorff_distance(phi4,phi4,rand_area),'(0.0)')
-    print('ph(phi4,phi5)',pompeiu_hausdorff_distance(phi4,phi5,rand_area),'(0.6)')
-    print('ph(phi4,phi6)',pompeiu_hausdorff_distance(phi4,phi6,rand_area),'(0.6)')
+    print('ph(True,phi4)',pompeiu_hausdorff_distance(true,phi4,rand_area,dimensions),'(0.6)')
+    print('ph(phi4,phi4)',pompeiu_hausdorff_distance(phi4,phi4,rand_area,dimensions),'(0.0)')
+    print('ph(phi4,phi5)',pompeiu_hausdorff_distance(phi4,phi5,rand_area,dimensions),'(0.6)')
+    print('ph(phi4,phi6)',pompeiu_hausdorff_distance(phi4,phi6,rand_area,dimensions),'(0.6)')
 
     print('')
 
-    print('ph(True,phi5)',pompeiu_hausdorff_distance(true,phi5,rand_area),'(0.6)')
-    print('ph(phi5,phi5)',pompeiu_hausdorff_distance(phi5,phi5,rand_area),'(0.0)')
-    print('ph(phi5,phi6)',pompeiu_hausdorff_distance(phi5,phi6,rand_area),'(0.6)')
+    print('ph(True,phi5)',pompeiu_hausdorff_distance(true,phi5,rand_area,dimensions),'(0.6)')
+    print('ph(phi5,phi5)',pompeiu_hausdorff_distance(phi5,phi5,rand_area,dimensions),'(0.0)')
+    print('ph(phi5,phi6)',pompeiu_hausdorff_distance(phi5,phi6,rand_area,dimensions),'(0.6)')
 
     print('')
 
-    print('ph(True,phi6)',pompeiu_hausdorff_distance(true,phi6,rand_area),'(0.6)')
-    print('ph(phi6,phi6)',pompeiu_hausdorff_distance(phi6,phi6,rand_area),'(0.0)')
+    print('ph(True,phi6)',pompeiu_hausdorff_distance(true,phi6,rand_area,dimensions),'(0.6)')
+    print('ph(phi6,phi6)',pompeiu_hausdorff_distance(phi6,phi6,rand_area,dimensions),'(0.0)')
     
     
     print('')
@@ -1431,16 +1429,12 @@ if __name__ == '__main__':
     phi_hypothesis = STLFormula.Conjunction(eventually1,eventually2)
 
     rand_area = [0,4]
-    dimensions = ['x','y','t']
+    dimensions = ['x','y']
 
-    print(phi_target)
+    print(pompeiu_hausdorff_distance(true,phi_target,rand_area,dimensions),symmetric_difference_distance(true,phi_target,rand_area,dimensions))
+    print(pompeiu_hausdorff_distance(true,phi_target,rand_area,dimensions),symmetric_difference_distance(true,STLFormula.Conjunction(eventually1,always_nnf),rand_area,dimensions))
+    print(pompeiu_hausdorff_distance(eventually1,eventually2,rand_area,dimensions),symmetric_difference_distance(eventually1,eventually2,rand_area,dimensions))
 
-    print(pompeiu_hausdorff_distance(true,phi_target,rand_area),symmetric_difference_distance(true,phi_target,rand_area,dimensions))
-    print(pompeiu_hausdorff_distance(true,phi_target,rand_area),symmetric_difference_distance(true,STLFormula.Conjunction(eventually1,always_nnf),rand_area,dimensions))
-    # print(pompeiu_hausdorff_distance(phi_hypothesis,phi_target,rand_area),symmetric_difference_distance(phi_hypothesis,phi_target,rand_area,dimensions))
-    print(pompeiu_hausdorff_distance(eventually1,eventually2,rand_area),symmetric_difference_distance(eventually1,eventually2,rand_area,dimensions))
-
-    # exit()
     print('')
     print('')
 
@@ -1463,7 +1457,7 @@ if __name__ == '__main__':
     phi = STLFormula.Conjunction(STLFormula.Conjunction(always_1,always_2),always_not)
 
     rand_area = [0,4]
-    dimensions = ['x','y','t']
+    dimensions = ['x','y']
     
-    print(symmetric_difference_distance(STLFormula.Conjunction(always_1,always_2),always_not,rand_area,dimensions))
-    print(symmetric_difference_distance(STLFormula.Conjunction(always_1,always_2),STLFormula.Conjunction(STLFormula.Conjunction(always_1,always_2),always_not),rand_area,dimensions))
+    print(pompeiu_hausdorff_distance(STLFormula.Conjunction(always_1,always_2),always_not,rand_area,dimensions),symmetric_difference_distance(STLFormula.Conjunction(always_1,always_2),always_not,rand_area,dimensions))
+    print(pompeiu_hausdorff_distance(STLFormula.Conjunction(always_1,always_2),STLFormula.Conjunction(STLFormula.Conjunction(always_1,always_2),always_not),rand_area,dimensions),symmetric_difference_distance(STLFormula.Conjunction(always_1,always_2),STLFormula.Conjunction(STLFormula.Conjunction(always_1,always_2),always_not),rand_area,dimensions))
